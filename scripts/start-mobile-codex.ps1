@@ -19,6 +19,39 @@ $node = if ($env:MOBILE_CODEX_NODE) {
   $nodeCmd.Path
 }
 
+$npm = if ($env:MOBILE_CODEX_NPM) {
+  $env:MOBILE_CODEX_NPM
+} else {
+  $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+  if ($npmCmd) {
+    $npmCmd.Path
+  } else {
+    $null
+  }
+}
+
+$nodeModules = Join-Path $repo 'node_modules'
+$distIndex = Join-Path $repo 'dist\index.html'
+if (-not (Test-Path $nodeModules)) {
+  throw "Upstream dependencies are not installed: $nodeModules. Run 'npm install' inside $repo first."
+}
+
+if (-not (Test-Path $distIndex)) {
+  if (-not $npm) {
+    throw "npm not found on PATH. Set MOBILE_CODEX_NPM if needed before building frontend assets."
+  }
+
+  Push-Location $repo
+  try {
+    & $npm 'run' 'build'
+    if ($LASTEXITCODE -ne 0) {
+      throw "npm run build failed with exit code $LASTEXITCODE"
+    }
+  } finally {
+    Pop-Location
+  }
+}
+
 $logDir = Join-Path $workspace 'tmp\logs'
 $stdoutLog = Join-Path $logDir 'mobile-codex-app.stdout.log'
 $stderrLog = Join-Path $logDir 'mobile-codex-app.stderr.log'

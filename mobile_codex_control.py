@@ -491,11 +491,17 @@ def build_remote_status(tailscale_status: dict[str, Any], serve_status: dict[str
         }
 
     host_and_port, config = web_entries[0]
-    host = str(host_and_port).replace(":443", "")
+    authority = str(host_and_port).strip()
+    scheme = "https"
+    if authority.endswith(":80"):
+        scheme = "http"
+        authority = authority[:-3]
+    elif authority.endswith(":443"):
+        authority = authority[:-4]
     target = (((config or {}).get("Handlers") or {}).get("/") or {}).get("Proxy")
     tailscale_data = tailscale_status.get("data") if tailscale_status.get("ok") else {}
     fallback_dns = normalize_dns_name((((tailscale_data or {}).get("Self") or {}).get("DNSName")))
-    url = f"https://{host or fallback_dns}" if (host or fallback_dns) else None
+    url = f"{scheme}://{authority or fallback_dns}" if (authority or fallback_dns) else None
     health_ok = False
     health_detail = "未执行远程健康检查"
     if url:
@@ -892,6 +898,15 @@ def wait_for_remote_reachable(timeout: float = 8.0) -> bool:
     return wait_for(_remote_ok, timeout=timeout, interval=1.0)
 
 
+def remote_enable_command() -> list[str]:
+    tailscale_status = load_tailscale_status()
+    tailscale_data = tailscale_status.get("data") if tailscale_status.get("ok") else {}
+    cert_domains = ((tailscale_data or {}).get("CertDomains") or [])
+    if cert_domains:
+        return [str(TAILSCALE), "serve", "--bg", "--yes", REMOTE_TARGET]
+    return [str(TAILSCALE), "serve", "--bg", "--yes", "--http=80", str(PROXY_PORT)]
+
+
 def perform_action(action: str) -> str:
     if action == "start":
         result = powershell_file("start-mobile-codex-stack.ps1", timeout=30)
@@ -919,7 +934,7 @@ def perform_action(action: str) -> str:
         return "整套服务已停止"
 
     if action == "enable_remote":
-        result = run_command([str(TAILSCALE), "serve", "--bg", REMOTE_TARGET], timeout=20)
+        result = run_command(remote_enable_command(), timeout=20)
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "开启远程发布失败")
         if not wait_for(remote_publish_is_enabled, timeout=12, interval=1.0):

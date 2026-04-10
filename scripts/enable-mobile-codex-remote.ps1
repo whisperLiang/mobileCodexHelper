@@ -18,7 +18,13 @@ if ($status.BackendState -ne 'Running') {
   throw 'Tailscale is not running yet.'
 }
 
-$serveOutput = & $tailscale serve --bg http://127.0.0.1:8080 2>&1
+$certDomains = @($status.CertDomains) | Where-Object { $_ }
+if (@($certDomains).Count -gt 0) {
+  $serveOutput = & $tailscale serve --bg --yes http://127.0.0.1:8080 2>&1
+} else {
+  $serveOutput = & $tailscale serve --bg --yes --http=80 8080 2>&1
+}
+
 $serveText = ($serveOutput | Out-String).Trim()
 
 if ($serveText -match 'https://login\.tailscale\.com/f/serve\?[^\s]+') {

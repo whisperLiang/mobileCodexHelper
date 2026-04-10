@@ -6,15 +6,27 @@ $upstream = if ($env:MOBILE_CODEX_UPSTREAM_DIR) {
 }
 
 $nodeCommand = if ($env:MOBILE_CODEX_NODE) {
-  Get-Item $env:MOBILE_CODEX_NODE -ErrorAction Stop
+  (Get-Item $env:MOBILE_CODEX_NODE -ErrorAction Stop).FullName
 } else {
-  Get-Command node -ErrorAction SilentlyContinue
+  $nodeFromPath = Get-Command node -ErrorAction SilentlyContinue
+  if ($nodeFromPath) { $nodeFromPath.Path } else { $null }
 }
 
+$wingetNginx = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\*nginx*\nginx-*\nginx.exe') -ErrorAction SilentlyContinue |
+  Sort-Object FullName -Descending |
+  Select-Object -First 1
+
 $nginxCommand = if ($env:MOBILE_CODEX_NGINX) {
-  Get-Item $env:MOBILE_CODEX_NGINX -ErrorAction Stop
+  (Get-Item $env:MOBILE_CODEX_NGINX -ErrorAction Stop).FullName
 } else {
-  Get-Command nginx -ErrorAction SilentlyContinue
+  $fromPath = Get-Command nginx -ErrorAction SilentlyContinue
+  if ($fromPath) {
+    $fromPath.Path
+  } elseif ($wingetNginx) {
+    $wingetNginx.FullName
+  } else {
+    $null
+  }
 }
 
 $tailscalePath = if ($env:MOBILE_CODEX_TAILSCALE) {
@@ -27,8 +39,8 @@ $tailscalePath = if ($env:MOBILE_CODEX_TAILSCALE) {
   Workspace = $workspace
   UpstreamExists = (Test-Path $upstream)
   UpstreamPath = $upstream
-  Node = if ($nodeCommand) { $nodeCommand.Path } else { $null }
-  Nginx = if ($nginxCommand) { $nginxCommand.Path } else { $null }
+  Node = $nodeCommand
+  Nginx = $nginxCommand
   Tailscale = if (Test-Path $tailscalePath) { $tailscalePath } else { $null }
   Python = (Get-Command python -ErrorAction SilentlyContinue).Path
 } | Format-List

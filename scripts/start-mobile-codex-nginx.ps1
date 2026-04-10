@@ -9,14 +9,21 @@ if (-not (Test-Path $asciiAlias)) {
   New-Item -ItemType Junction -Path $asciiAlias -Target $workspace | Out-Null
 }
 
+$wingetNginx = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\*nginx*\nginx-*\nginx.exe') -ErrorAction SilentlyContinue |
+  Sort-Object FullName -Descending |
+  Select-Object -First 1
+
 $nginxCmd = if ($env:MOBILE_CODEX_NGINX) {
   $env:MOBILE_CODEX_NGINX
 } else {
   $found = Get-Command nginx -ErrorAction SilentlyContinue
-  if (-not $found) {
+  if ($found) {
+    $found.Path
+  } elseif ($wingetNginx) {
+    $wingetNginx.FullName
+  } else {
     throw 'nginx not found on PATH. Set MOBILE_CODEX_NGINX if needed.'
   }
-  $found.Path
 }
 
 $nginxRoot = Join-Path $asciiAlias '.runtime\nginx'
