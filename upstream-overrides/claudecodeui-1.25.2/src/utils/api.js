@@ -90,9 +90,18 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ summary, provider }),
     }),
+  createCodexSession: (projectPath) =>
+    authenticatedFetch('/api/codex/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ projectPath }),
+    }),
   deleteCodexSession: (sessionId) =>
     authenticatedFetch(`/api/codex/sessions/${sessionId}`, {
       method: 'DELETE',
+    }),
+  archiveCodexSession: (sessionId) =>
+    authenticatedFetch(`/api/codex/sessions/${sessionId}/archive`, {
+      method: 'POST',
     }),
   deleteGeminiSession: (sessionId) =>
     authenticatedFetch(`/api/gemini/sessions/${sessionId}`, {

@@ -1,4 +1,4 @@
-import { Check, Clock, Edit2, Trash2, X } from 'lucide-react';
+import { Archive, Check, Clock, Edit2, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import { Badge, Button } from '../../../../shared/view/ui';
 import { cn } from '../../../../lib/utils';
@@ -49,6 +49,17 @@ export default function SidebarSessionItem({
 }: SidebarSessionItemProps) {
   const sessionView = createSessionViewModel(session, currentTime, t);
   const isSelected = selectedSession?.id === session.id;
+  const isCodexArchiveAction = session.__provider === 'codex';
+  const canEditSession = !IS_CODEX_ONLY_HARDENED;
+  const canRemoveSession = isCodexArchiveAction || (!IS_CODEX_ONLY_HARDENED && !sessionView.isCursorSession);
+  const removeActionTitle = isCodexArchiveAction ? 'Archive session' : t('tooltips.deleteSession');
+  const RemoveIcon = isCodexArchiveAction ? Archive : Trash2;
+  const removeActionClassName = isCodexArchiveAction
+    ? 'bg-amber-50 dark:bg-amber-900/20'
+    : 'bg-red-50 dark:bg-red-900/20';
+  const removeIconClassName = isCodexArchiveAction
+    ? 'text-amber-600 dark:text-amber-400'
+    : 'text-red-600 dark:text-red-400';
 
   const selectMobileSession = () => {
     onProjectSelect(project);
@@ -110,15 +121,16 @@ export default function SidebarSessionItem({
               </div>
             </div>
 
-            {!IS_CODEX_ONLY_HARDENED && !sessionView.isCursorSession && (
+            {canRemoveSession && (
               <button
-                className="ml-1 flex h-5 w-5 items-center justify-center rounded-md bg-red-50 opacity-70 transition-transform active:scale-95 dark:bg-red-900/20"
+                className={`ml-1 flex h-5 w-5 items-center justify-center rounded-md opacity-70 transition-transform active:scale-95 ${removeActionClassName}`}
                 onClick={(event) => {
                   event.stopPropagation();
                   requestDeleteSession();
                 }}
+                title={removeActionTitle}
               >
-                <Trash2 className="h-2.5 w-2.5 text-red-600 dark:text-red-400" />
+                <RemoveIcon className={`h-2.5 w-2.5 ${removeIconClassName}`} />
               </button>
             )}
           </div>
@@ -160,7 +172,7 @@ export default function SidebarSessionItem({
         </Button>
 
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 transform items-center gap-1 opacity-0 transition-all duration-200 group-hover:opacity-100">
-            {!IS_CODEX_ONLY_HARDENED && editingSession === session.id ? (
+            {canEditSession && editingSession === session.id ? (
               <>
                 <input
                   type="text"
@@ -199,28 +211,30 @@ export default function SidebarSessionItem({
                   <X className="h-3 w-3 text-gray-600 dark:text-gray-400" />
                 </button>
               </>
-            ) : !IS_CODEX_ONLY_HARDENED ? (
+            ) : canEditSession || canRemoveSession ? (
               <>
-                <button
-                  className="flex h-6 w-6 items-center justify-center rounded bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onStartEditingSession(session.id, sessionView.sessionName);
-                  }}
-                  title={t('tooltips.editSessionName')}
-                >
-                  <Edit2 className="h-3 w-3 text-gray-600 dark:text-gray-400" />
-                </button>
-                {!sessionView.isCursorSession && (
+                {canEditSession && (
                   <button
-                    className="flex h-6 w-6 items-center justify-center rounded bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40"
+                    className="flex h-6 w-6 items-center justify-center rounded bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onStartEditingSession(session.id, sessionView.sessionName);
+                    }}
+                    title={t('tooltips.editSessionName')}
+                  >
+                    <Edit2 className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                  </button>
+                )}
+                {canRemoveSession && (
+                  <button
+                    className={`flex h-6 w-6 items-center justify-center rounded hover:brightness-95 ${removeActionClassName}`}
                     onClick={(event) => {
                       event.stopPropagation();
                       requestDeleteSession();
                     }}
-                    title={t('tooltips.deleteSession')}
+                    title={removeActionTitle}
                   >
-                    <Trash2 className="h-3 w-3 text-red-600 dark:text-red-400" />
+                    <RemoveIcon className={`h-3 w-3 ${removeIconClassName}`} />
                   </button>
                 )}
               </>

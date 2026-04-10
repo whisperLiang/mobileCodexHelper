@@ -422,7 +422,71 @@ export function useProjectsState({
   );
 
   const handleNewSession = useCallback(
-    (project: Project) => {
+    async (project: Project) => {
+      if (IS_CODEX_ONLY_HARDENED) {
+        try {
+          const projectPath =
+            (typeof project.fullPath === 'string' && project.fullPath.length > 0
+              ? project.fullPath
+              : project.path) || '';
+
+          if (!projectPath) {
+            throw new Error('Project path is missing');
+          }
+
+          const response = await api.createCodexSession(projectPath);
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+
+          const payload = (await response.json()) as { session?: ProjectSession };
+          const createdSession = payload.session
+            ? { ...payload.session, __provider: 'codex' as const }
+            : null;
+
+          if (!createdSession) {
+            throw new Error('Created session payload missing');
+          }
+
+          const nextProject: Project = {
+            ...project,
+            codexSessions: [
+              createdSession,
+              ...(project.codexSessions ?? []).filter((session) => session.id !== createdSession.id),
+            ],
+            sessionMeta: {
+              ...project.sessionMeta,
+              total: Math.max(
+                (project.sessionMeta?.total as number | undefined ?? 0) + 1,
+                ((project.codexSessions ?? []).length + 1),
+              ),
+            },
+          };
+
+          setProjects((prevProjects) =>
+            prevProjects.map((candidate) =>
+              candidate.name === project.name
+                ? nextProject
+                : candidate,
+            ),
+          );
+          setSelectedProject(nextProject);
+          setSelectedSession(createdSession);
+          setActiveTab('chat');
+          navigate(`/session/${createdSession.id}`);
+
+          if (isMobile) {
+            setSidebarOpen(false);
+          }
+
+          void refreshProjectsSilently();
+          return;
+        } catch (error) {
+          console.error('Error creating Codex session:', error);
+          alert('Failed to create Codex thread');
+        }
+      }
+
       setSelectedProject(project);
       setSelectedSession(null);
       setActiveTab('chat');
@@ -431,9 +495,9 @@ export function useProjectsState({
       if (isMobile) {
         setSidebarOpen(false);
       }
-    },
-    [isMobile, navigate],
-  );
+      },
+      [isMobile, navigate, refreshProjectsSilently],
+    );
 
   const handleSessionDelete = useCallback(
     (sessionIdToDelete: string) => {

@@ -414,7 +414,7 @@ export function useSidebarController({
       return;
     }
 
-    if (IS_CODEX_ONLY_HARDENED) {
+    if (IS_CODEX_ONLY_HARDENED && sessionDeleteConfirmation.provider !== 'codex') {
       setSessionDeleteConfirmation(null);
       return;
     }
@@ -425,7 +425,7 @@ export function useSidebarController({
     try {
       let response;
       if (provider === 'codex') {
-        response = await api.deleteCodexSession(sessionId);
+        response = await api.archiveCodexSession(sessionId);
       } else if (provider === 'gemini') {
         response = await api.deleteGeminiSession(sessionId);
       } else {

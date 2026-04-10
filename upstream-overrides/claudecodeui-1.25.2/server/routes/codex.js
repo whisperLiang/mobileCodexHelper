@@ -6,6 +6,7 @@ import os from 'os';
 import TOML from '@iarna/toml';
 import { getCodexSessions, getCodexSessionMessages, deleteCodexSession } from '../projects.js';
 import { applyCustomSessionNames, sessionNamesDb } from '../database/db.js';
+import { archiveCodexSession, createCodexDraftSession } from '../codex-desktop-sync.js';
 
 const router = express.Router();
 const CODEX_ONLY_HARDENED_MODE = process.env.CODEX_ONLY_HARDENED_MODE !== 'false';
@@ -75,6 +76,33 @@ router.get('/sessions', async (req, res) => {
   }
 });
 
+router.post('/sessions', async (req, res) => {
+  try {
+    const { projectPath } = req.body || {};
+
+    if (!projectPath || typeof projectPath !== 'string') {
+      return res.status(400).json({ success: false, error: 'projectPath is required' });
+    }
+
+    const created = await createCodexDraftSession(projectPath);
+    const sessions = await getCodexSessions(projectPath, { limit: 0 });
+    applyCustomSessionNames(sessions, 'codex');
+    const session = sessions.find((candidate) => candidate.id === created.sessionId) || {
+      id: created.sessionId,
+      summary: created.displayTitle,
+      messageCount: 0,
+      lastActivity: new Date().toISOString(),
+      cwd: projectPath,
+      provider: 'codex',
+    };
+
+    res.status(201).json({ success: true, session });
+  } catch (error) {
+    console.error('Error creating Codex session:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 router.get('/sessions/:sessionId/messages', async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -89,6 +117,22 @@ router.get('/sessions/:sessionId/messages', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (error) {
     console.error('Error fetching Codex session messages:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.post('/sessions/:sessionId/archive', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const archived = await archiveCodexSession(sessionId);
+
+    if (!archived) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error(`Error archiving Codex session ${req.params.sessionId}:`, error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -17,6 +17,7 @@ import { Codex } from '@openai/codex-sdk';
 import crypto from 'crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { syncCodexThreadState } from './codex-desktop-sync.js';
 
 // Track active sessions
 const activeCodexSessions = new Map();
@@ -357,6 +358,17 @@ export async function queryCodex(command, options = {}, ws) {
       const session = activeCodexSessions.get(currentSessionId);
       if (session) {
         session.status = session.status === 'aborted' ? 'aborted' : 'completed';
+      }
+    }
+
+    const persistedSessionId = thread?.id || sessionId || null;
+    if (persistedSessionId) {
+      try {
+        await syncCodexThreadState(persistedSessionId, {
+          preferredProjectPath: requestedWorkingDirectory,
+        });
+      } catch (syncError) {
+        console.warn('[Codex] Failed to sync desktop thread state:', syncError.message);
       }
     }
   }

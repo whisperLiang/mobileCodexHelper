@@ -67,6 +67,11 @@ import { open } from 'sqlite';
 import os from 'os';
 import sessionManager from './sessionManager.js';
 import { applyCustomSessionNames } from './database/db.js';
+import {
+  CODEX_DRAFT_DISPLAY_TITLE,
+  isCodexDraftPlaceholderMessage,
+  normalizeCodexThreadTitle,
+} from './codex-desktop-sync.js';
 
 const CODEX_ONLY_HARDENED_MODE = process.env.CODEX_ONLY_HARDENED_MODE !== 'false';
 
@@ -1731,6 +1736,10 @@ function isVisibleCodexUserMessage(payload) {
   return true;
 }
 
+function isCodexDraftVisibleMessage(payload) {
+  return isVisibleCodexUserMessage(payload) && isCodexDraftPlaceholderMessage(payload.message);
+}
+
 // Parse a Codex session JSONL file to extract metadata
 async function parseCodexSessionFile(filePath) {
   try {
@@ -1768,9 +1777,15 @@ async function parseCodexSessionFile(filePath) {
 
           // Count visible user messages and extract summary from the latest plain user input.
           if (entry.type === 'event_msg' && isVisibleCodexUserMessage(entry.payload)) {
-            messageCount++;
-            if (entry.payload.message) {
-              lastUserMessage = entry.payload.message;
+            const normalizedMessage = normalizeCodexThreadTitle(entry.payload.message);
+
+            if (isCodexDraftVisibleMessage(entry.payload)) {
+              lastUserMessage = lastUserMessage || normalizedMessage || CODEX_DRAFT_DISPLAY_TITLE;
+            } else {
+              messageCount++;
+              if (normalizedMessage) {
+                lastUserMessage = normalizedMessage;
+              }
             }
           }
 
@@ -1877,12 +1892,16 @@ async function getCodexSessionMessages(sessionId, limit = null, offset = 0) {
           
           // Use event_msg.user_message for user-visible inputs.
           if (entry.type === 'event_msg' && isVisibleCodexUserMessage(entry.payload)) {
+            if (isCodexDraftVisibleMessage(entry.payload)) {
+              continue;
+            }
+
             messages.push({
               type: 'user',
               timestamp: entry.timestamp,
               message: {
                 role: 'user',
-                content: entry.payload.message
+                content: normalizeCodexThreadTitle(entry.payload.message) || entry.payload.message
               }
             });
           }
