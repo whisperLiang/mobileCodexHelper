@@ -61,6 +61,7 @@
 手机浏览器
    ↓
 Tailscale 私网 HTTPS
+（未启用证书时会先回退为仅 tailnet 内可访问的 HTTP）
    ↓
 本机 nginx 代理
    ↓
@@ -84,11 +85,13 @@ Tailscale 私网 HTTPS
 ### 强烈推荐
 
 - Tailscale
+- 可登录 Tailscale 管理后台的账号
 
 原因很简单：
 
 - 这是最容易做成“只有你自己能访问”的远程方案
 - 比直接公网暴露安全得多
+- 启用 MagicDNS 和 HTTPS Certificates 后，手机端体验会明显更稳定
 
 ## 更省事的使用方式
 
@@ -122,12 +125,34 @@ Tailscale 私网 HTTPS
 4. 在初始化向导里确认 `node.exe`、`nginx.exe`、`tailscale.exe` 路径
 5. 点击“`一键初始化并启动`”
 6. 在电脑浏览器打开 `http://127.0.0.1:3001`，完成第一次注册
-7. 在桌面工具里点击“开启手机访问”
-8. 让手机和电脑登录同一个 Tailscale 网络
-9. 用手机打开桌面工具里显示的“手机访问地址”
-10. 首次登录新设备时，在电脑端批准这台设备
+7. 让手机和电脑登录同一个 Tailscale 网络
+8. 打开 `https://login.tailscale.com/admin/dns`，确认已启用 `MagicDNS`
+9. 在同一页面启用 `HTTPS Certificates`
+10. 回到桌面工具里点击“开启手机访问”
+11. 优先使用桌面工具里显示的 `https://...` 手机访问地址
+12. 首次登录新设备时，在电脑端批准这台设备
 
 做到这里，你通常已经可以从手机继续控制电脑上的 Codex 了。
+
+## 手机远程访问配置
+
+如果你准备长期用手机访问，推荐按下面顺序配置一次：
+
+1. 电脑和手机都安装并登录 Tailscale，确保在同一个 tailnet 里
+2. 在电脑上确认本地服务已经启动，桌面工具里 `PC 应用服务` 和 `nginx` 都是正常
+3. 打开 `https://login.tailscale.com/admin/dns`
+4. 确认 `MagicDNS` 已启用
+5. 启用 `HTTPS Certificates`
+6. 回到桌面工具，点击“开启手机访问”
+7. 等桌面工具里“手机访问地址”变成 `https://...`
+8. 用手机浏览器打开这个 `https://...` 地址，再完成登录
+
+补充说明：
+
+- 如果桌面工具暂时显示的是 `http://...`，说明当前还是 Tailscale 的 tailnet-only HTTP 回退地址
+- 这种地址通常也能联通，但手机浏览器可能提示“不安全”，登录体验不如 HTTPS 稳定
+- 启用 `HTTPS Certificates` 后，重新点击一次“开启手机访问”，通常就会切到正式的 `https://...` 地址
+- 首次联调建议先用手机浏览器，不要一上来就用封装 App 或 WebView
 
 ## 首次设备批准
 
@@ -158,7 +183,7 @@ Tailscale 私网 HTTPS
 
 - 电脑端 `http://127.0.0.1:3001` 能打开
 - 桌面控制工具里 PC 应用服务和 nginx 都是正常
-- 手机能打开私有 HTTPS 地址
+- 手机能打开桌面工具显示的私有 HTTPS 地址
 - 手机首次登录时，电脑端能看到待审批设备
 - 你批准后，手机能进入项目和会话列表
 - 手机发送消息后，电脑上的 Codex 会继续执行
@@ -277,7 +302,22 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test-override-flow.ps1 -U
 
 如果浏览器可以、壳不可以，通常是壳自身 WebView 能力不足，而不是账号密码错误。
 
-### 3. 出现 502
+### 3. 手机提示“不安全”或桌面工具只显示 `http://...`
+
+优先检查：
+
+- `https://login.tailscale.com/admin/dns` 里是否已经启用 `MagicDNS`
+- `HTTPS Certificates` 是否已经启用
+- 启用后，是否重新点击过一次“开启手机访问”
+- 桌面工具里的“手机访问地址”是否已经切成 `https://...`
+
+补充说明：
+
+- 未启用 HTTPS 证书时，脚本会先回退到 tailnet-only HTTP，便于先验证链路是否能通
+- 这种情况下手机浏览器可能提示站点不安全，部分登录或缓存行为也可能受影响
+- 只要切到 `https://...`，这类问题通常会明显减少
+
+### 4. 出现 502
 
 优先检查这些日志：
 
@@ -285,7 +325,7 @@ powershell -ExecutionPolicy Bypass -File scripts/smoke-test-override-flow.ps1 -U
 - `tmp/logs/mobile-codex-app.stderr.log`
 - nginx 日志目录
 
-### 4. 为什么不直接公网暴露？
+### 5. 为什么不直接公网暴露？
 
 因为这个项目控制的是你电脑上的本地 Codex，会话权限很高。  
 推荐私网、反向代理、设备白名单三层一起用，不建议直接裸露到公网。
