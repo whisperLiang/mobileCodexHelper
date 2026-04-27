@@ -238,6 +238,27 @@ powershell -ExecutionPolicy Bypass -File scripts/check-mobile-codex-runtime.ps1
 
 ## 常用命令
 
+### 启动桌面控制工具
+
+如果你使用发布页里的便携版：
+
+- 直接双击 `MobileCodexControl.exe`
+
+如果你是从源码运行：
+
+1. 先启动整套服务
+2. 再启动桌面控制工具
+
+```powershell
+python mobile_codex_control.py
+```
+
+或者：
+
+```powershell
+scripts\launch-mobile-codex-control.cmd
+```
+
 ### 启动整套服务
 
 ```powershell

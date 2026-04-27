@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { Project } from '../../../types/app';
 import { IS_CODEX_ONLY_HARDENED } from '../../../constants/config';
+import { parseDateInput } from '../../../utils/dateUtils';
 import type {
   AdditionalSessionsByProject,
   ProjectSortOrder,
@@ -8,6 +9,17 @@ import type {
   SessionViewModel,
   SessionWithProvider,
 } from '../types/types';
+
+const getCodexSessionTimestamp = (session: SessionWithProvider) =>
+  session.lastActivity ?? session.updated_at ?? session.createdAt ?? session.created_at ?? 0;
+
+const getDefaultSessionTimestamp = (session: SessionWithProvider) =>
+  session.lastActivity ?? session.updated_at ?? session.createdAt ?? session.created_at ?? 0;
+
+const formatSessionTimestamp = (value: Date | string | number | null | undefined): string => {
+  const date = parseDateInput(value);
+  return Number.isNaN(date.getTime()) ? String(value ?? '') : date.toISOString();
+};
 
 export const readProjectSortOrder = (): ProjectSortOrder => {
   try {
@@ -42,14 +54,14 @@ export const persistStarredProjects = (starredProjects: Set<string>) => {
 
 export const getSessionDate = (session: SessionWithProvider): Date => {
   if (session.__provider === 'cursor') {
-    return new Date(session.createdAt || 0);
+    return parseDateInput(session.createdAt ?? session.created_at ?? 0);
   }
 
   if (session.__provider === 'codex') {
-    return new Date(session.createdAt || session.lastActivity || 0);
+    return parseDateInput(getCodexSessionTimestamp(session));
   }
 
-  return new Date(session.lastActivity || session.createdAt || 0);
+  return parseDateInput(getDefaultSessionTimestamp(session));
 };
 
 export const getSessionName = (session: SessionWithProvider, t: TFunction): string => {
@@ -70,14 +82,14 @@ export const getSessionName = (session: SessionWithProvider, t: TFunction): stri
 
 export const getSessionTime = (session: SessionWithProvider): string => {
   if (session.__provider === 'cursor') {
-    return String(session.createdAt || '');
+    return formatSessionTimestamp(session.createdAt ?? session.created_at);
   }
 
   if (session.__provider === 'codex') {
-    return String(session.createdAt || session.lastActivity || '');
+    return formatSessionTimestamp(getCodexSessionTimestamp(session));
   }
 
-  return String(session.lastActivity || session.createdAt || '');
+  return formatSessionTimestamp(getDefaultSessionTimestamp(session));
 };
 
 export const createSessionViewModel = (

@@ -77,6 +77,37 @@ const getProjectSessions = (project: Project): ProjectSession[] => {
   ];
 };
 
+const CODEX_ROLLOUT_SESSION_ID_PATTERN =
+  /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+const getChangedSessionId = (
+  changedFile: string | undefined,
+  watchProvider?: string,
+): string | null => {
+  if (!changedFile) {
+    return null;
+  }
+
+  const normalized = changedFile.replace(/\\/g, '/');
+  const filename = normalized.split('/').pop();
+  if (!filename) {
+    return null;
+  }
+
+  const basename = filename.replace(/\.jsonl$/i, '');
+  if (watchProvider === 'codex' || basename.startsWith('rollout-')) {
+    const match = basename.match(CODEX_ROLLOUT_SESSION_ID_PATTERN);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  return basename;
+};
+
+const getWatchProvider = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
 const isUpdateAdditive = (
   currentProjects: Project[],
   updatedProjects: Project[],
@@ -240,19 +271,16 @@ export function useProjectsState({
     const projectsMessage = latestMessage as ProjectsUpdatedMessage;
 
     if (projectsMessage.changedFile && selectedSession && selectedProject) {
-      const normalized = projectsMessage.changedFile.replace(/\\/g, '/');
-      const changedFileParts = normalized.split('/');
+      const changedSessionId = getChangedSessionId(
+        projectsMessage.changedFile,
+        getWatchProvider(projectsMessage.watchProvider),
+      );
 
-      if (changedFileParts.length >= 2) {
-        const filename = changedFileParts[changedFileParts.length - 1];
-        const changedSessionId = filename.replace('.jsonl', '');
+      if (changedSessionId === selectedSession.id) {
+        const isSessionActive = activeSessions.has(selectedSession.id);
 
-        if (changedSessionId === selectedSession.id) {
-          const isSessionActive = activeSessions.has(selectedSession.id);
-
-          if (!isSessionActive) {
-            setExternalMessageUpdate((prev) => prev + 1);
-          }
+        if (!isSessionActive) {
+          setExternalMessageUpdate((prev) => prev + 1);
         }
       }
     }
@@ -298,6 +326,16 @@ export function useProjectsState({
 
     if (!updatedSelectedSession) {
       setSelectedSession(null);
+      return;
+    }
+
+    const normalizedUpdatedSelectedSession =
+      updatedSelectedSession.__provider || !selectedSession.__provider
+        ? updatedSelectedSession
+        : { ...updatedSelectedSession, __provider: selectedSession.__provider };
+
+    if (serialize(normalizedUpdatedSelectedSession) !== serialize(selectedSession)) {
+      setSelectedSession(normalizedUpdatedSelectedSession);
     }
   }, [latestMessage, selectedProject, selectedSession, activeSessions, projects]);
 
